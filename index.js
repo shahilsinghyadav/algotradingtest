@@ -3,9 +3,17 @@ const express= require ("express");
 const cors = require("cors");
 const app = express();
 var escapeHtml = require("escape-html");
-const welcome = require("./controllers/api/welcome");
 let { SmartAPI, WebSocket,WebSocketV2 } = require('smartapi-javascript');
 var axios = require('axios');
+var session = require("express-session");
+const express_session = require("./session/express_session.js");
+const cookieParser = require("cookie-parser");
+const welcomeRoute= require("./routes/welcomeRoute.js");
+const apis= require("./routes/apiRoute.js");
+const logoutRoute= require("./routes/logoutRoute.js");
+
+app.use(cookieParser());
+app.use(express_session);
 require('dotenv').config();
 
 
@@ -83,19 +91,21 @@ let smart_api = new SmartAPI({
 	refresh_token: REFRESH_TOKEN
 });
 
-smart_api
-	.generateSession(process.env.clientcode, process.env.password, process.env.totp)
-	.then((data) => {
-		// Profile details
-		console.log(data);
-	})
-	.catch((ex) => {
-		//Log error
+app.post('/login', async (req, res) => {
+    try {
+        const data = await smart_api.generateSession(process.env.clientcode, process.env.password, process.env.totp);
+        req.session.smart_api = smart_api;
+        console.log(data);
+        res.cookie('smart_api', smart_api);
+        res.status(200).json({ message: 'Login successful' });
+    } catch (error) {
+        console.error('Error logging in:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
 });
-	
 
 
-app.use("/", welcome);
+app.use("/", welcomeRoute, logoutRoute , apis );
 
 app.listen(port, () => {
     console.log("Server started at port ", port);
